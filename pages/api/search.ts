@@ -24,7 +24,7 @@ export default async function handler(
     };
 
     // Search for matching words
-    const result = await prisma.cognates.findFirst({
+    let result = await prisma.cognates.findFirst({
       where: whereCondition,
       select: {
         uid: true,
@@ -36,8 +36,28 @@ export default async function handler(
       },
     });
 
+    // If no exact match is found, try to find words like the query
     if (!result) {
-      return res.status(404).json({ message: "No matching words found." });
+      result = await prisma.cognates.findFirst({
+        where: {
+          word: {
+            contains: query.toLowerCase(),
+          },
+          ...(language && language !== "undefined" ? { language } : {}),
+        },
+        select: {
+          uid: true,
+          word: true,
+          translit: true,
+          definition: true,
+          sentence: true,
+          language_rel: { select: { language: true } },
+        },
+      });
+
+      if (!result) {
+        return res.status(404).json({ message: "No matching words found." });
+      }
     }
 
     // Fetch connected words efficiently using raw SQL
