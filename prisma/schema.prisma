@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "cockroachdb"
+  url      = env("DATABASE_URL")
+}
+
+model cognates {
+  uid          BigInt    @id @default(autoincrement())
+  concept_id   String    @db.String(20)
+  language     String    @db.String(10)
+  word         String
+  translit     String?
+  definition   String?
+  sentence     String?
+  language_rel languages @relation(fields: [language], references: [id], map: "cognates_language_fkey")
+
+  edges1 edges[] @relation("EdgeWord1")
+  edges2 edges[] @relation("EdgeWord2")
+}
+
+model languages {
+  id       String     @id @db.String(3)
+  language String
+  cognates cognates[]
+}
+
+model edges {
+  uid      BigInt @id @default(autoincrement())
+  word1_id BigInt
+  word2_id BigInt
+
+  word1 cognates @relation("EdgeWord1", fields: [word1_id], references: [uid])
+  word2 cognates @relation("EdgeWord2", fields: [word2_id], references: [uid])
+
+  @@unique([word1_id, word2_id])
+}

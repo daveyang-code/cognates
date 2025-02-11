@@ -1,0 +1,87 @@
+import { NextApiRequest, NextApiResponse } from "next";
+
+import prisma from "@/lib/prisma";
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  try {
+    let { language } = req.query;
+
+    // Treat "undefined" as no language filter
+    if (language === "undefined" || language === "") {
+      language = undefined;
+    }
+
+    // Validate the language query parameter (if provided)
+    if (
+      language &&
+      (typeof language !== "string" || !/^[a-z]{3}$/.test(language))
+    ) {
+      return res.status(400).json({ error: "Invalid language parameter" });
+    }
+
+    // Define the filtering condition
+    const whereCondition = language ? { language } : {};
+
+    // Count total cognates for the requested language (if any)
+    const totalCognates = await prisma.cognates.count({
+      where: whereCondition,
+    });
+
+    if (totalCognates === 0) {
+      return res.status(404).json({ message: "No cognates found" });
+    }
+
+    // Select a random cognate within the language filter (if provided)
+    const randomCognate = await prisma.cognates.findFirst({
+      skip: totalCognates > 1 ? Math.floor(Math.random() * totalCognates) : 0,
+      where: whereCondition,
+      select: {
+        uid: true,
+        word: true,
+        translit: true,
+        language_rel: { select: { language: true } },
+      },
+    });
+
+    if (!randomCognate) {
+      return res.status(404).json({ message: "No cognates found" });
+    }
+
+    // Fetch connected words efficiently using raw SQL
+    const connectedCognates = await prisma.$queryRaw<
+      { word: string; translit: string | null; language_name: string }[]
+    >`
+      SELECT 
+        c.word, 
+        c.translit, 
+        l.language AS language_name
+      FROM edges e
+      JOIN cognates c ON c.uid = 
+        CASE 
+          WHEN e.word1_id = ${randomCognate.uid} THEN e.word2_id 
+          ELSE e.word1_id 
+        END
+      JOIN languages l ON c.language = l.id
+      WHERE e.word1_id = ${randomCognate.uid} OR e.word2_id = ${randomCognate.uid};
+    `;
+
+    // Return the response
+    return res.status(200).json({
+      randomCognate: {
+        word: randomCognate.word,
+        translit: randomCognate.translit,
+        language_name: randomCognate.language_rel.language,
+      },
+      connectedCognates,
+    });
+  } catch (error) {
+    console.error("Error fetching cognates:", error);
+    return res.status(500).json({
+      error: "Internal Server Error",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
