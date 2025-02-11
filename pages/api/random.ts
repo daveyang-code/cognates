@@ -77,7 +77,8 @@ export default async function handler(
           ELSE e.word1_id 
         END
       JOIN languages l ON c.language = l.id
-      WHERE e.word1_id = ${randomCognate.uid} OR e.word2_id = ${randomCognate.uid};
+      WHERE e.word1_id = ${randomCognate.uid} OR e.word2_id = ${randomCognate.uid}
+      ORDER BY language_name;
     `;
 
     // Convert BigInt values to strings

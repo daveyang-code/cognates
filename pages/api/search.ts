@@ -65,7 +65,8 @@ export default async function handler(
           ELSE e.word1_id 
         END
       JOIN languages l ON c.language = l.id
-      WHERE e.word1_id = ${result.uid} OR e.word2_id = ${result.uid};
+      WHERE e.word1_id = ${result.uid} OR e.word2_id = ${result.uid}
+      ORDER BY l.language;
     `;
 
     // Convert BigInt values to strings
