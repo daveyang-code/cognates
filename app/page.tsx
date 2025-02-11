@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { EditableCardContent } from "@/components/EditableCardContent";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 
@@ -26,12 +27,22 @@ export default function Home() {
     language: string;
   } | null>(null);
   const [concept, setConcept] = useState<{
+    id: string;
     word: string;
     language_name: string;
     translit: string;
+    definition?: string;
+    sentence?: string;
   } | null>(null);
   const [cognates, setCognates] = useState<
-    { word: string; language_name: string; translit: string }[]
+    {
+      id: string;
+      word: string;
+      language_name: string;
+      translit: string;
+      definition?: string;
+      sentence?: string;
+    }[]
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +55,6 @@ export default function Home() {
     const fetchLanguages = async () => {
       try {
         const res = await axios.get("/api/languages");
-        console.log("Fetched languages:", res.data);
         if (Array.isArray(res.data)) {
           setLanguages(res.data);
         } else {
@@ -142,17 +152,36 @@ export default function Home() {
       {concept && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center">
               <span>{concept.language_name}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {concept.word}
-            {concept.translit && (
-              <p className="text-sm text-muted-foreground">
-                Transliteration: {concept.translit}
-              </p>
-            )}
+            <EditableCardContent
+              word={concept.word}
+              translit={concept.translit}
+              definition={concept.definition}
+              sentence={concept.sentence}
+              onSave={async ({ definition, sentence }) => {
+                try {
+                  await axios.patch(`/api/cognates/${concept.id}`, {
+                    definition,
+                    sentence,
+                  });
+                  setConcept((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          definition,
+                          sentence,
+                        }
+                      : null
+                  );
+                } catch (error) {
+                  console.error("Failed to save", error);
+                }
+              }}
+            />
           </CardContent>
         </Card>
       )}
@@ -174,12 +203,29 @@ export default function Home() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {cognate.word}
-                  {cognate.translit && (
-                    <p className="text-sm text-muted-foreground">
-                      Transliteration: {cognate.translit}
-                    </p>
-                  )}
+                  <EditableCardContent
+                    word={cognate.word}
+                    translit={cognate.translit}
+                    definition={cognate.definition}
+                    sentence={cognate.sentence}
+                    onSave={async ({ definition, sentence }) => {
+                      try {
+                        await axios.patch(`/api/cognates/${cognate.id}`, {
+                          definition,
+                          sentence,
+                        });
+                        setCognates((prevCognates) =>
+                          prevCognates.map((c) =>
+                            c.id === cognate.id
+                              ? { ...c, definition, sentence }
+                              : c
+                          )
+                        );
+                      } catch (error) {
+                        console.error("Failed to save", error);
+                      }
+                    }}
+                  />
                 </CardContent>
               </Card>
             ))}
