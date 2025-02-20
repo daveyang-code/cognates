@@ -7,9 +7,10 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    const { query, language } = req.query as {
+    const { query, language, language2 } = req.query as {
       query?: string;
       language?: string;
+      language2?: string;
     };
 
     // Validate the search query
@@ -33,6 +34,7 @@ export default async function handler(
         definition: true,
         sentence: true,
         language_rel: { select: { language: true } },
+        concept_id: true,
       },
     });
 
@@ -52,6 +54,7 @@ export default async function handler(
           definition: true,
           sentence: true,
           language_rel: { select: { language: true } },
+          concept_id: true,
         },
       });
 
@@ -60,34 +63,24 @@ export default async function handler(
       }
     }
 
-    // Fetch connected words efficiently using raw SQL
-    const connectedCognates = await prisma.$queryRaw<
-      {
-        uid: bigint; // Use bigint here
-        word: string;
-        translit: string | null;
-        definition: string | null;
-        sentence: string | null;
-        language_name: string;
-      }[]
-    >`
-      SELECT
-        c.uid, 
-        c.word, 
-        c.translit, 
-        c.definition,
-        c.sentence,
-        l.language AS language_name
-      FROM edges e
-      JOIN cognates c ON c.uid = 
-        CASE 
-          WHEN e.word1_id = ${result.uid} THEN e.word2_id 
-          ELSE e.word1_id 
-        END
-      JOIN languages l ON c.language = l.id
-      WHERE e.word1_id = ${result.uid} OR e.word2_id = ${result.uid}
-      ORDER BY l.language;
-    `;
+    // Fetch connected words using Prisma
+    const connectedCognates = await prisma.cognates.findMany({
+      where: {
+        concept_id: result.concept_id,
+        uid: { not: result.uid },
+        ...(language2 && language2 !== "undefined"
+          ? { language: language2 }
+          : {}),
+      },
+      select: {
+        uid: true,
+        word: true,
+        translit: true,
+        definition: true,
+        sentence: true,
+        language_rel: { select: { language: true } },
+      },
+    });
 
     // Convert BigInt values to strings
     const formattedResult = {
@@ -99,14 +92,16 @@ export default async function handler(
       language_name: result.language_rel.language,
     };
 
-    const formattedConnectedCognates = connectedCognates.map((cognate) => ({
+    const formattedConnectedCognates = connectedCognates
+      .map((cognate) => ({
       id: String(cognate.uid), // Convert uid to string
       word: cognate.word,
       translit: cognate.translit,
       definition: cognate.definition,
       sentence: cognate.sentence,
-      language_name: cognate.language_name,
-    }));
+      language_name: cognate.language_rel.language,
+      }))
+      .sort((a, b) => a.language_name.localeCompare(b.language_name));
 
     // Return the response
     return res.status(200).json({

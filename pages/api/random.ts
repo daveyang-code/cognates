@@ -7,17 +7,28 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    let { language } = req.query;
+    let { language, language2 } = req.query;
 
     // Treat "undefined" as no language filter
     if (language === "undefined" || language === "") {
       language = undefined;
     }
 
+    if (language2 === "undefined" || language2 === "") {
+      language2 = undefined;
+    }
+
     // Validate the language query parameter (if provided)
     if (
       language &&
       (typeof language !== "string" || !/^[a-z]{3}$/.test(language))
+    ) {
+      return res.status(400).json({ error: "Invalid language parameter" });
+    }
+
+    if (
+      language2 &&
+      (typeof language2 !== "string" || !/^[a-z]{3}$/.test(language2))
     ) {
       return res.status(400).json({ error: "Invalid language parameter" });
     }
@@ -45,6 +56,7 @@ export default async function handler(
         definition: true,
         sentence: true,
         language_rel: { select: { language: true } },
+        concept_id: true,
       },
     });
 
@@ -52,34 +64,21 @@ export default async function handler(
       return res.status(404).json({ message: "No cognates found" });
     }
 
-    // Fetch connected words efficiently using raw SQL
-    const connectedCognates = await prisma.$queryRaw<
-      {
-        uid: bigint; // Use bigint here
-        word: string;
-        translit: string | null;
-        definition: string | null;
-        sentence: string | null;
-        language_name: string;
-      }[]
-    >`
-      SELECT
-        c.uid, 
-        c.word, 
-        c.translit, 
-        c.definition,
-        c.sentence,
-        l.language AS language_name
-      FROM edges e
-      JOIN cognates c ON c.uid = 
-        CASE 
-          WHEN e.word1_id = ${randomCognate.uid} THEN e.word2_id 
-          ELSE e.word1_id 
-        END
-      JOIN languages l ON c.language = l.id
-      WHERE e.word1_id = ${randomCognate.uid} OR e.word2_id = ${randomCognate.uid}
-      ORDER BY language_name;
-    `;
+    // Fetch connected words using Prisma
+    const connectedCognates = await prisma.cognates.findMany({
+      where: {
+        concept_id: randomCognate.concept_id,
+        ...(language2 ? { language: language2 } : {}),
+      },
+      select: {
+        uid: true,
+        word: true,
+        translit: true,
+        definition: true,
+        sentence: true,
+        language_rel: { select: { language: true } },
+      },
+    });
 
     // Convert BigInt values to strings
     const formattedRandomCognate = {
@@ -91,14 +90,16 @@ export default async function handler(
       language_name: randomCognate.language_rel.language,
     };
 
-    const formattedConnectedCognates = connectedCognates.map((cognate) => ({
-      id: String(cognate.uid), // Convert uid to string
-      word: cognate.word,
-      translit: cognate.translit,
-      definition: cognate.definition,
-      sentence: cognate.sentence,
-      language_name: cognate.language_name,
-    }));
+    const formattedConnectedCognates = connectedCognates
+      .map((cognate) => ({
+        id: String(cognate.uid), // Convert uid to string
+        word: cognate.word,
+        translit: cognate.translit,
+        definition: cognate.definition,
+        sentence: cognate.sentence,
+        language_name: cognate.language_rel.language,
+      }))
+      .sort((a, b) => a.language_name.localeCompare(b.language_name));
 
     // Return the response
     return res.status(200).json({

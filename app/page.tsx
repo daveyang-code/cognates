@@ -26,6 +26,10 @@ export default function Home() {
     id: string;
     language: string;
   } | null>(null);
+  const [language2, setLanguage2] = useState<{
+    id: string;
+    language: string;
+  } | null>(null);
   const [concept, setConcept] = useState<{
     id: string;
     word: string;
@@ -73,7 +77,9 @@ export default function Home() {
   const fetchRandomWord = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/random?language=${language?.id}`);
+      const response = await axios.get(
+        `/api/random?language=${language?.id}&language2=${language2?.id}`
+      );
       const data = response.data;
       setConcept(data.randomCognate);
       setCognates(data.connectedCognates);
@@ -94,7 +100,7 @@ export default function Home() {
 
     try {
       const response = await axios.get(
-        `/api/search?query=${searchQuery}&language=${language?.id}`
+        `/api/search?query=${searchQuery}&language=${language?.id}&language2=${language2?.id}`
       );
       const data = response.data;
       setConcept(data.result);
@@ -119,9 +125,28 @@ export default function Home() {
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select Language" />
+            <SelectValue placeholder="Primary Language" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All Languages</SelectItem>
+            {languages.map((lang) => (
+              <SelectItem key={lang.id} value={lang.id}>
+                {lang.language}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={language2?.id ?? ""}
+          onValueChange={(id) =>
+            setLanguage2(languages.find((lang) => lang.id === id) || null)
+          }
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Target Language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Languages</SelectItem>
             {languages.map((lang) => (
               <SelectItem key={lang.id} value={lang.id}>
                 {lang.language}
