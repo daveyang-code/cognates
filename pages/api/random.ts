@@ -69,6 +69,7 @@ export default async function handler(
       where: {
         concept_id: randomCognate.concept_id,
         ...(language2 ? { language: language2 } : {}),
+        uid: { not: randomCognate.uid },
       },
       select: {
         uid: true,
@@ -99,7 +100,13 @@ export default async function handler(
         sentence: cognate.sentence,
         language_name: cognate.language_rel.language,
       }))
-      .sort((a, b) => a.language_name.localeCompare(b.language_name));
+      .sort((a, b) => {
+        const wordComparison = a.word.localeCompare(b.word);
+        if (wordComparison !== 0) {
+          return wordComparison;
+        }
+        return a.language_name.localeCompare(b.language_name);
+      });
 
     // Return the response
     return res.status(200).json({
