@@ -211,14 +211,14 @@ export default function Home() {
         </Card>
       )}
 
-      {cognates.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Cognates</CardTitle>
-            <CardDescription>
-              Words in other languages that share a similar meaning and origin.
-            </CardDescription>
-          </CardHeader>
+      <Card>
+        <CardHeader>
+          <CardTitle>Cognates</CardTitle>
+          <CardDescription>
+            Words in other languages that share a similar meaning and origin.
+          </CardDescription>
+        </CardHeader>
+        {cognates.length > 0 && (
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {cognates.map((cognate, index) => (
               <Card key={index}>
@@ -255,8 +255,13 @@ export default function Home() {
               </Card>
             ))}
           </CardContent>
-        </Card>
-      )}
+        )}
+        {cognates.length === 0 && (
+          <CardContent>
+            <p className="text-gray-500">No cognates found.</p>
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }
